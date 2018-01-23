@@ -517,7 +517,6 @@ function buildInvolved()
       {
         player.ships.forEach(( ship, shipIdx ) => {
           var invEntry = initInvolvedEntry( player );
-          invEntry.kills = ship.kills.length;
           teamLosses[ player.group.team ] += ship.lost;
           var temp = gShipTypes.find(X => X.I == ship.ship_type_id);
           if ( temp != undefined )
