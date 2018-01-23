@@ -493,6 +493,7 @@ function initInvolvedEntry( player )
   invEntry.podKillID = 0;
   invEntry.shipID = -1;
   invEntry.kills = 0;
+  invEntry.damage = 0;
   return invEntry;
 }
 
@@ -500,10 +501,12 @@ function buildInvolved()
 {
   var involved  = [];
   var teamLosses = [];
+  var teamDamage = [];
   for( var i = 0; i < gTeams.length; ++i )
   {
     involved.push( [] );
     teamLosses[ i ] = 0;
+    teamDamage[ i ] = 0;
   }
 
   profile( 'involved-genTempData', function( ) {
@@ -544,6 +547,8 @@ function buildInvolved()
               if ( player.group.team != kill.player.group.team )
               {
                 ++invEntry.kills;
+                invEntry.damage += kill.damage;
+                teamDamage [ player.group.team ] += kill.damage;
               }
             }
           } );
@@ -617,6 +622,7 @@ function buildInvolved()
   var returnArray = [];
   returnArray.push(totalLosses);
   returnArray.push(involved);
+  returnArray.push(teamDamage);
   returnArray.push(teamLosses);
   return returnArray;
 }
@@ -1552,6 +1558,7 @@ function generateInvolved(idToName)
   
   var returnValue = buildInvolved();
   var teamLosses = returnValue.pop();
+  var teamDamage = returnValue.pop();
   var involved  = returnValue.pop();
     
   var html = [];
@@ -1564,12 +1571,14 @@ function generateInvolved(idToName)
       html.push( '<td class="view-involved" width=' + width + '%>' );
       html.push( '  <table class="view-involvedDetail ui-widget-content">' );
       html.push( '    <thead class="view-involvedHeader">' );
-      html.push( '      <th colspan=2>Pilot/Ship</td>' );
-      html.push( '      <th>Corp/Alliance</td>' );
+      html.push( '      <th colspan=2>Pilot/Ship</th>' );
+      html.push( '      <th>Kills</th>' );
+      html.push( '      <th>Damage</th>' );
+      html.push( '      <th>Corp/Alliance</th>' );
       html.push( '    </thead>' );
       team.forEach(( invEntry ) => {
         var rowClass = TEAM_COLORS[ teamIdx ] + ( invEntry.victim ? 'Kill' : oddRow ? 'Odd' : 'Even' );
-        var rowData = generateKillMailCell( '', invEntry, totalLosses - teamLosses[ teamIdx ], idToName );
+        var rowData = generateKillMailCell( '', invEntry, totalLosses - teamLosses[ teamIdx ], teamDamage [ teamIdx ], idToName );
         html.push( TableRow( rowClass, rowData ));
         oddRow = !oddRow;
       } );
@@ -1585,8 +1594,10 @@ function generateInvolved(idToName)
   profile( 'involved-append',   function( ) { document.getElementById( 'involvedTable' ).innerHTML = html.join( '' ); } );
 }
 
-function generateKillMailCell( cellClass, invEntry, nonTeamLosses, idToName )
+function generateKillMailCell( cellClass, invEntry, nonTeamLosses, teamDamage, idToName )
 {
+  var percentage;
+
   var imageLink      = eveImageLink( 'Render', invEntry.shipData.I );
   var leftUpperCell  = zKillLink( 'character', invEntry.playerID, invEntry.playerName ) + ' ' + ( invEntry.podKillID == 0 ? '' : zKillLink( 'detail', invEntry.podKillID, '[Pod]' ));
   if (invEntry.playerID === undefined) {
@@ -1598,12 +1609,29 @@ function generateKillMailCell( cellClass, invEntry, nonTeamLosses, idToName )
 
   var cellData   = TableData( 'view-involvedIcon ' + cellClass, invEntry.victim ? zKillLink( 'kill', invEntry.killmail_id, imageLink ) : imageLink );
   cellData      += TableData( 'teamText ' + cellClass, Bold( leftUpperCell )  + '<br>' + leftLowerCell );
-  if ( nonTeamLosses != undefined )
-  {
+
+  // Cell with kills
+  if ( nonTeamLosses == undefined ) {
+    percentage = '-';
+  } else {
     assert(( nonTeamLosses != 0 ) || ( invEntry.kills != 0 ));
-    var percentage = ( nonTeamLosses == 0 ? 0 : Math.round( invEntry.kills / nonTeamLosses * 1000 ) / 10 );
-    cellData    += TableData( 'teamText ' + cellClass + ' view-rightAlign' , 'N&deg; ' + invEntry.kills + '<br>' + percentage.toFixed( 1 ) + '%' );
+    percentage = ( nonTeamLosses == 0 ? 0 : Math.round( invEntry.kills / nonTeamLosses * 1000 ) / 10 );
+    percentage = percentage.toFixed( 1 ) + '%';
   }
+  cellData += TableData('teamText ' + cellClass + ' view-rightAlign' ,
+                        invEntry.kills + '<br>' +  percentage);
+
+  // Cell with damage
+  if ( teamDamage == undefined) {
+    percentage = '-';
+  } else {
+    percentage = ( teamDamage == 0 ? 0 : Math.round( invEntry.damage / teamDamage * 1000 ) / 10 );
+    percentage = percentage.toFixed( 1 ) + '%';
+  }
+  cellData += TableData( 'teamText ' + cellClass + ' view-rightAlign',
+                         invEntry.damage + '<br/>' + percentage);
+
+  // Cell with Corp/Alliance
   cellData      += TableData( 'teamText ' + cellClass, Bold( rightUpperCell ) + '<br>' + rightLowerCell );
   return cellData;
 }
